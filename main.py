@@ -5,20 +5,64 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-import schedule
 import threading
 import time
 from datetime import datetime
 
-#7enviar o e-mail
+# Lista de e-mails e senhas salvas manualmente
+email_senhas = {
+    
+}
+
+# Função para selecionar um e-mail salvo e preencher os campos
+def selecionar_email(event):
+    try:
+        selected_index = email_listbox.curselection()[0]
+        email = email_listbox.get(selected_index)
+
+        email_entry.delete(0, END)
+        email_entry.insert(0, email)
+
+        # Preenche automaticamente a senha correspondente
+        if email in email_senhas:
+            password_entry.delete(0, END)
+            password_entry.insert(0, email_senhas[email])
+        else:
+            password_entry.delete(0, END)
+
+    except IndexError:
+        pass
+
+# Função para remover um e-mail salvo
+def remover_email():
+    try:
+        selected_index = email_listbox.curselection()[0]
+        email = email_listbox.get(selected_index)
+
+        if email in email_senhas:
+            del email_senhas[email]  # Remove do dicionário
+            email_listbox.delete(selected_index)  # Remove da listbox
+            messagebox.showinfo("Sucesso", f"E-mail {email} removido com sucesso!")
+        
+        email_entry.delete(0, END)
+        password_entry.delete(0, END)
+
+    except IndexError:
+        messagebox.showerror("Erro", "Selecione um e-mail para remover!")
+
+# Enviar e-mail
 def send_email():
     try:
-        sender_email = email_entry.get()
-        password = "rlod jswu bmgi uzfv"
-        recipient_email = recipient_entry.get()
+        sender_email = email_entry.get().strip()
+        password = password_entry.get().strip()
+        recipient_email = recipient_entry.get().strip()
         subject = subject_entry.get()
         body = body_entry.get("1.0", END)
         file_path = file_path_var.get()
+
+        if not password:
+            messagebox.showerror("Erro", "Senha não encontrada para este e-mail!")
+            return
 
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender_email, password)
@@ -34,95 +78,88 @@ def send_email():
             with open(file_path, "rb") as attachment:
                 part.set_payload(attachment.read())
             encoders.encode_base64(part)
-            part.add_header('Content-Disposition', f'attachment; filename={file_path.split("/")[-1]}')
+            part.add_header('Content-Disposition', f'attachment; filename="{file_path.split("/")[-1]}"')
             msg.attach(part)
 
         server.sendmail(sender_email, recipient_email, msg.as_string())
         server.quit()
-        
+
         messagebox.showinfo("Sucesso", "E-mail enviado com sucesso!")
 
     except Exception as e:
         messagebox.showerror("Erro", f"Falha ao enviar o e-mail: {str(e)}")
 
-# agendar email
-def agendar_email():
-    date = date_entry.get()  #
-    hour = hour_entry.get()  
+# Função para adicionar um novo e-mail à lista manualmente
+def adicionar_email():
+    novo_email = email_entry.get().strip()
+    nova_senha = password_entry.get().strip()
 
-    if not date or not hour:
-        messagebox.showerror("Erro", "Defina uma data e horário para o envio!")
-        return
+    if novo_email and nova_senha:
+        if novo_email not in email_senhas:
+            email_senhas[novo_email] = nova_senha
+            email_listbox.insert(END, novo_email)
+            messagebox.showinfo("Sucesso", f"E-mail {novo_email} salvo com sucesso!")
+        else:
+            messagebox.showerror("Erro", "E-mail já está salvo!")
+    else:
+        messagebox.showerror("Erro", "Preencha o e-mail e a senha!")
 
-    try:
-        data_hora = datetime.strptime(f"{date} {hour}", "%d/%m/%Y %H:%M")  # Convertendo para datetime
-    except ValueError:
-        messagebox.showerror("Erro", "Formato de data ou hora inválido! Use dd/mm/aaaa HH:MM")
-        return
-
-    #verifiçao se chegou a data/hora certa para enviar
-    def verificar_agendamento():
-        while True:
-            if datetime.now() >= data_hora:
-                send_email()
-                break
-            time.sleep(30)  # Verifica a cada 30 segundos
-
-    threading.Thread(target=verificar_agendamento, daemon=True).start()
-    messagebox.showinfo("Agendado", f"E-mail será enviado em {date} às {hour}")
-
-#selecionar amultiplos arquivos
-def selecionar_arquivo():
-    file_path = filedialog.askopenfilename(filetypes=[("Todos os arquivos", "*.*")])
-    file_path_var.set(file_path)
-
-# iniciar o GUI
+# Criar interface gráfica
 root = Tk()
 root.title("Envio de E-mail")
 
-#Layout
-Label(root, text="Seu E-mail:").grid(row=0, column=0, padx=10, pady=5)
+# Lista de e-mails salvos
+Label(root, text="E-mails Salvos:").grid(row=0, column=0, padx=10, pady=5)
+email_listbox = Listbox(root, height=5)
+email_listbox.grid(row=0, column=1, padx=10, pady=5)
+for email in email_senhas.keys():
+    email_listbox.insert(END, email)
+
+email_listbox.bind("<<ListboxSelect>>", selecionar_email)
+
+# Entrada para novo e-mail
+Label(root, text="Novo E-mail:").grid(row=1, column=0, padx=10, pady=5)
 email_entry = Entry(root, width=40)
-email_entry.grid(row=0, column=1, padx=10, pady=5)
+email_entry.grid(row=1, column=1, padx=10, pady=5)
 
-Label(root, text="E-mail do Destinatário:").grid(row=2, column=0, padx=10, pady=5)
+# Entrada para senha
+Label(root, text="Senha:").grid(row=2, column=0, padx=10, pady=5)
+password_entry = Entry(root, width=40, show="*")  # Esconde a senha com '*'
+password_entry.grid(row=2, column=1, padx=10, pady=5)
+
+# Botões para adicionar e remover e-mail
+add_button = Button(root, text="Salvar E-mail", command=adicionar_email)
+add_button.grid(row=3, column=0, pady=10)
+
+remove_button = Button(root, text="Remover E-mail", command=remover_email)
+remove_button.grid(row=3, column=1, pady=10)
+
+# Entrada para destinatário
+Label(root, text="E-mail do Destinatário:").grid(row=4, column=0, padx=10, pady=5)
 recipient_entry = Entry(root, width=40)
-recipient_entry.grid(row=2, column=1, padx=10, pady=5)
+recipient_entry.grid(row=4, column=1, padx=10, pady=5)
 
-Label(root, text="Assunto:").grid(row=3, column=0, padx=10, pady=5)
+# Entrada para assunto
+Label(root, text="Assunto:").grid(row=5, column=0, padx=10, pady=5)
 subject_entry = Entry(root, width=40)
-subject_entry.grid(row=3, column=1, padx=10, pady=5)
+subject_entry.grid(row=5, column=1, padx=10, pady=5)
 
-Label(root, text="Corpo do E-mail:").grid(row=4, column=0, padx=10, pady=5)
+# Corpo do e-mail
+Label(root, text="Corpo do E-mail:").grid(row=6, column=0, padx=10, pady=5)
 body_entry = Text(root, width=40, height=5)
-body_entry.grid(row=4, column=1, padx=10, pady=5)
+body_entry.grid(row=6, column=1, padx=10, pady=5)
 
-#botao do arquivo
-Label(root, text="Selecionar Arquivo:").grid(row=5, column=0, padx=10, pady=5)
+# Botão para anexar arquivos
+Label(root, text="Selecionar Arquivo:").grid(row=7, column=0, padx=10, pady=5)
 file_path_var = StringVar()
 file_path_entry = Entry(root, textvariable=file_path_var, width=40, state="readonly")
-file_path_entry.grid(row=5, column=1, padx=10, pady=5)
-file_button = Button(root, text="Selecionar Arquivo", command=selecionar_arquivo)
-file_button.grid(row=5, column=2, padx=10, pady=5)
+file_path_entry.grid(row=7, column=1, padx=10, pady=5)
+file_button = Button(root, text="Selecionar Arquivo", command=lambda: file_path_var.set(filedialog.askopenfilename()))
+file_button.grid(row=7, column=2, padx=10, pady=5)
 
-#data
-Label(root, text="Data do envio (dd/mm/aaaa):", font=("Arial", 10)).grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 0))
-date_entry = Entry(root, width=20)
-date_entry.grid(row=7, column=0, columnspan=2, padx=10, pady=5)
-
-
-Label(root, text="Hora do envio (HH:MM):", font=("Arial", 10)).grid(row=8, column=0, columnspan=2, padx=10, pady=(10, 0))
-hour_entry = Entry(root, width=20)
-hour_entry.grid(row=9, column=0, columnspan=2, padx=10, pady=5)
-
-
-#enviar o e-mail imediatamente
+# Botão para enviar e-mail
 send_button = Button(root, text="Enviar Agora", command=send_email)
-send_button.grid(row=12, column=0, columnspan=2, pady=10)
+send_button.grid(row=8, column=0, columnspan=2, pady=10)
 
-#agendar o envio
-schedule_button = Button(root, text="Agendar Envio", command=agendar_email)
-schedule_button.grid(row=10, column=0, columnspan=2, pady=10)
-
-# Iniciando a interface gráfica
+# Iniciar a interface gráfica
 root.mainloop()
