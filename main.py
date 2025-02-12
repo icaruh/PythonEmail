@@ -7,12 +7,20 @@ from email.mime.base import MIMEBase
 from email import encoders
 import threading
 import time
+import json
 from datetime import datetime
+import os
 
 # Lista de e-mails e senhas salvas manualmente
-email_senhas = {
-    
-}
+email_senhas = {}
+
+# Nome do arquivo onde os e-mails serão armazenados
+EMAILS_FILE = "emails.json"
+
+
+if not os.path.exists(EMAILS_FILE):
+    with open(EMAILS_FILE, "w") as file:
+        json.dump({}, file)  # cria um JSON vazio
 
 # Função para selecionar um e-mail salvo e preencher os campos
 def selecionar_email(event):
@@ -42,6 +50,7 @@ def remover_email():
         if email in email_senhas:
             del email_senhas[email]  # Remove do dicionário
             email_listbox.delete(selected_index)  # Remove da listbox
+            salvar_emails()  # Atualiza o arquivo JSON
             messagebox.showinfo("Sucesso", f"E-mail {email} removido com sucesso!")
         
         email_entry.delete(0, END)
@@ -98,11 +107,37 @@ def adicionar_email():
         if novo_email not in email_senhas:
             email_senhas[novo_email] = nova_senha
             email_listbox.insert(END, novo_email)
+            salvar_emails()  # Salva os dados no arquivo
             messagebox.showinfo("Sucesso", f"E-mail {novo_email} salvo com sucesso!")
         else:
             messagebox.showerror("Erro", "E-mail já está salvo!")
     else:
         messagebox.showerror("Erro", "Preencha o e-mail e a senha!")
+
+# Função para carregar e-mails do arquivo JSON
+def carregar_emails():
+    global email_senhas
+    try:
+        with open(EMAILS_FILE, "r") as file:
+            content = file.read()
+            if content.strip():  # verifica se o arquivo não está vazio
+                email_senhas = json.loads(content)
+            else:
+                email_senhas = {}  
+         
+            email_listbox.delete(0, END)
+            for email in email_senhas.keys():
+                email_listbox.insert(END, email)
+    except FileNotFoundError:
+        email_senhas = {}  # Se o arquivo não existir, inicializa com um dicionário vazio
+    except json.JSONDecodeError:
+        messagebox.showerror("Erro", "O arquivo de e-mails está corrompido. Inicializando com um dicionário vazio.")
+        email_senhas = {}  # inicializa tudo do 0 de o json tiver corrompido
+
+# Função para salvar e-mails no arquivo JSON
+def salvar_emails():
+    with open(EMAILS_FILE, "w") as file:
+        json.dump(email_senhas, file)
 
 # Criar interface gráfica
 root = Tk()
@@ -160,6 +195,9 @@ file_button.grid(row=7, column=2, padx=10, pady=5)
 # Botão para enviar e-mail
 send_button = Button(root, text="Enviar Agora", command=send_email)
 send_button.grid(row=8, column=0, columnspan=2, pady=10)
+
+# Carregar e-mails salvos ao iniciar
+carregar_emails()
 
 # Iniciar a interface gráfica
 root.mainloop()
