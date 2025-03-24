@@ -98,6 +98,11 @@ def send_email():
 
     except Exception as e:
         messagebox.showerror("Erro", f"Falha ao enviar o e-mail: {str(e)}")
+        
+def enviar_e_limpar():
+    send_email()
+    data_entry.delete(0, END)
+    hora_entry.delete(0, END)
 
 # agendar envio de e-mail com data e hora
 def agendar_envio_unico():
@@ -113,7 +118,8 @@ def agendar_envio_unico():
             return
 
         messagebox.showinfo("Agendado", f"E-mail será enviado em {data} às {hora}.")
-        threading.Timer(segundos_ate_envio, lambda: (send_email(), data_entry.delete(0, END), hora_entry.delete(0, END))).start()
+        root.after(int(segundos_ate_envio * 1000), enviar_e_limpar)
+
     except ValueError:
         messagebox.showerror("Erro", "Formato inválido! Use DD/MM/AAAA para data e HH:MM para hora.")
 
